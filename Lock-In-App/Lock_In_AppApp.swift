@@ -6,15 +6,18 @@
 //
 
 import SwiftUI
+import CoreData
 
 @main
 struct Lock_In_AppApp: App {
+    let persistenceController = PersistenceController.shared
     @StateObject private var viewModel = AppViewModel()
 
     var body: some Scene {
         WindowGroup {
             ContentView()
                 .environmentObject(viewModel)
+                .environment(\.managedObjectContext, persistenceController.container.viewContext)
         }
     }
 }

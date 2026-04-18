@@ -6,10 +6,12 @@
 //
 
 import SwiftUI
+import CoreData
 
 struct ReflectionSheet: View {
     @EnvironmentObject var viewModel: AppViewModel
     @Environment(\.dismiss) var dismiss
+    @Environment(\.managedObjectContext) private var viewContext
 
     var body: some View {
         NavigationStack {
@@ -26,7 +28,7 @@ struct ReflectionSheet: View {
                     )
 
                 Button("Save Reflection") {
-                    viewModel.saveReflection()
+                    viewModel.saveReflection(context: viewContext)
                     dismiss()
                 }
                 .buttonStyle(.borderedProminent)

@@ -8,6 +8,7 @@
 import Foundation
 import SwiftUI
 import Combine
+import CoreData
 
 class AppViewModel: ObservableObject {
     @Published var sessionType: String = "Focus"
@@ -21,39 +22,19 @@ class AppViewModel: ObservableObject {
     @Published var focusDuration: Int = 25
     @Published var breakDuration: Int = 5
 
-    @Published var sessionLogs: [SessionLog] = [
-        SessionLog(
-            sessionType: "Focus",
-            startTime: Date().addingTimeInterval(-3600),
-            endTime: Date().addingTimeInterval(-2100),
-            plannedDuration: 25,
-            actualDuration: 25,
-            completed: true,
-            note: "Good concentration today."
-        ),
-        SessionLog(
-            sessionType: "Break",
-            startTime: Date().addingTimeInterval(-2000),
-            endTime: Date().addingTimeInterval(-1700),
-            plannedDuration: 5,
-            actualDuration: 5,
-            completed: true,
-            note: ""
-        ),
-        SessionLog(
-            sessionType: "Focus",
-            startTime: Date().addingTimeInterval(-10000),
-            endTime: Date().addingTimeInterval(-9400),
-            plannedDuration: 25,
-            actualDuration: 10,
-            completed: false,
-            note: "Ended early for class."
-        )
-    ]
-
     var timer: Timer?
 
+    var currentSessionStartTime: Date?
+    var pausedAt: Date?
+    var totalPausedTime: TimeInterval = 0
+
     func startSession() {
+        if currentSessionStartTime == nil {
+            currentSessionStartTime = Date()
+            totalPausedTime = 0
+            pausedAt = nil
+        }
+
         isRunning = true
         isPaused = false
 
@@ -68,12 +49,20 @@ class AppViewModel: ObservableObject {
     }
 
     func pauseSession() {
+        guard isRunning else { return }
+
         isPaused = true
         isRunning = false
+        pausedAt = Date()
         timer?.invalidate()
     }
 
     func resumeSession() {
+        if let pausedAt = pausedAt {
+            totalPausedTime += Date().timeIntervalSince(pausedAt)
+            self.pausedAt = nil
+        }
+
         startSession()
     }
 
@@ -88,26 +77,36 @@ class AppViewModel: ObservableObject {
         timer?.invalidate()
         isRunning = false
         isPaused = false
+        timeRemaining = 0
         showReflection = true
     }
 
-    func saveReflection() {
+    func saveReflection(context: NSManagedObjectContext) {
         let planned = sessionType == "Focus" ? focusDuration : breakDuration
-        let actualMinutes = planned - (timeRemaining / 60)
+        let endTime = Date()
+        let startTime = currentSessionStartTime ?? endTime
 
-        let newLog = SessionLog(
-            sessionType: sessionType,
-            startTime: Date().addingTimeInterval(Double(-(actualMinutes * 60))),
-            endTime: Date(),
-            plannedDuration: planned,
-            actualDuration: actualMinutes,
-            completed: timeRemaining == 0,
-            note: reflectionText
-        )
+        let rawElapsedSeconds = endTime.timeIntervalSince(startTime) - totalPausedTime
+        let elapsedSeconds = max(0, Int(rawElapsedSeconds.rounded()))
 
-        sessionLogs.insert(newLog, at: 0)
+        let newLog = SessionLog(context: context)
+        newLog.id = UUID()
+        newLog.sessionType = sessionType
+        newLog.startTime = startTime
+        newLog.endTime = endTime
+        newLog.plannedDuration = Int32(planned)
+        newLog.actualDuration = Int32(elapsedSeconds)
+        newLog.completed = (timeRemaining == 0)
+        newLog.note = reflectionText
+
+        do {
+            try context.save()
+        } catch {
+            print("Failed to save session: \(error.localizedDescription)")
+        }
+
         reflectionText = ""
-        resetTimer()
+        resetSessionTracking()
 
         if sessionType == "Focus" {
             sessionType = "Break"
@@ -124,11 +123,20 @@ class AppViewModel: ObservableObject {
         isPaused = false
     }
 
+    func resetSessionTracking() {
+        resetTimer()
+        currentSessionStartTime = nil
+        pausedAt = nil
+        totalPausedTime = 0
+    }
+
     func applySettings() {
-        if sessionType == "Focus" {
-            timeRemaining = focusDuration * 60
-        } else {
-            timeRemaining = breakDuration * 60
+        if !isRunning && !isPaused {
+            if sessionType == "Focus" {
+                timeRemaining = focusDuration * 60
+            } else {
+                timeRemaining = breakDuration * 60
+            }
         }
     }
 
@@ -137,33 +145,4 @@ class AppViewModel: ObservableObject {
         let seconds = timeRemaining % 60
         return String(format: "%02d:%02d", minutes, seconds)
     }
-
-    var focusSessionsToday: Int {
-        sessionLogs.filter { $0.sessionType == "Focus" && $0.completed }.count
-    }
-
-    var focusSessionsThisWeek: Int {
-        sessionLogs.filter { $0.sessionType == "Focus" }.count
-    }
-
-    var averageFocusDuration: Int {
-        let focusLogs = sessionLogs.filter { $0.sessionType == "Focus" && $0.completed }
-        if focusLogs.isEmpty {
-            return 0
-        }
-        let total = focusLogs.reduce(0) { $0 + $1.actualDuration }
-        return total / focusLogs.count
-    }
-
-    var streakCount: Int {
-        return 4
-    }
 }
-
-// Handles:
-// Timer state
-// button actions
-// showing settings
-// showing reflection
-// fake session history
-//f ake analytics calculations
