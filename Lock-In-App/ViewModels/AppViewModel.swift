@@ -47,6 +47,7 @@ class AppViewModel: ObservableObject {
         timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
             self.updateTimeRemaining()
         }
+        NotificationManager.shared.scheduleSessionEndNotification(sessionType: sessionType, timeRemaining: timeRemaining)
     }
 
     func pauseSession() {
@@ -56,6 +57,7 @@ class AppViewModel: ObservableObject {
         isRunning = false
         pausedAt = Date()
         timer?.invalidate()
+        NotificationManager.shared.cancelSessionEndNotification()
     }
 
     func resumeSession() {
@@ -77,6 +79,7 @@ class AppViewModel: ObservableObject {
         timer?.invalidate()
         isRunning = false
         isPaused = false
+        NotificationManager.shared.cancelSessionEndNotification()
         showReflection = true
     }
 
@@ -85,6 +88,7 @@ class AppViewModel: ObservableObject {
         isRunning = false
         isPaused = false
         timeRemaining = 0
+        NotificationManager.shared.cancelSessionEndNotification()
         showReflection = true
     }
 
@@ -143,6 +147,7 @@ class AppViewModel: ObservableObject {
         pausedAt = nil
         totalPausedTime = 0
         sessionEndTime = nil
+        NotificationManager.shared.cancelSessionEndNotification()
     }
 
     func applySettings() {

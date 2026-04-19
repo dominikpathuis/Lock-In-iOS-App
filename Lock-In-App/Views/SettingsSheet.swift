@@ -14,8 +14,8 @@ struct SettingsSheet: View {
     var body: some View {
         NavigationStack {
             Form {
-                Stepper("Focus Duration: \(viewModel.focusDuration) min", value: $viewModel.focusDuration, in: 5...60, step: 5)
-                Stepper("Break Duration: \(viewModel.breakDuration) min", value: $viewModel.breakDuration, in: 5...30, step: 5)
+                Stepper("Focus Duration: \(viewModel.focusDuration) min", value: $viewModel.focusDuration, in: 1...60, step: 1)
+                Stepper("Break Duration: \(viewModel.breakDuration) min", value: $viewModel.breakDuration, in: 1...30, step: 1)
             }
             .navigationTitle("Settings")
             .toolbar {

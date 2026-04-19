@@ -13,6 +13,11 @@ struct Lock_In_AppApp: App {
     let persistenceController = PersistenceController.shared
     @StateObject private var viewModel = AppViewModel()
 
+    init() {
+        NotificationManager.shared.configure()
+        NotificationManager.shared.requestAuthorization()
+    }
+
     var body: some Scene {
         WindowGroup {
             ContentView()
