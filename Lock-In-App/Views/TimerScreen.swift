@@ -9,6 +9,7 @@ import SwiftUI
 
 struct TimerScreen: View {
     @EnvironmentObject var viewModel: AppViewModel
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         NavigationStack {
@@ -67,6 +68,11 @@ struct TimerScreen: View {
             }
             .sheet(isPresented: $viewModel.showReflection) {
                 ReflectionSheet()
+            }
+            .onChange(of: scenePhase) { _, newPhase in
+                if newPhase == .active {
+                    viewModel.handleAppDidBecomeActive()
+                }
             }
         }
     }

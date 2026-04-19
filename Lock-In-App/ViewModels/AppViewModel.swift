@@ -27,6 +27,7 @@ class AppViewModel: ObservableObject {
     var currentSessionStartTime: Date?
     var pausedAt: Date?
     var totalPausedTime: TimeInterval = 0
+    var sessionEndTime: Date?
 
     func startSession() {
         if currentSessionStartTime == nil {
@@ -35,16 +36,16 @@ class AppViewModel: ObservableObject {
             pausedAt = nil
         }
 
+        if sessionEndTime == nil {
+            sessionEndTime = Date().addingTimeInterval(TimeInterval(timeRemaining))
+        }
+
         isRunning = true
         isPaused = false
 
         timer?.invalidate()
         timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
-            if self.timeRemaining > 0 {
-                self.timeRemaining -= 1
-            } else {
-                self.finishSession()
-            }
+            self.updateTimeRemaining()
         }
     }
 
@@ -59,7 +60,13 @@ class AppViewModel: ObservableObject {
 
     func resumeSession() {
         if let pausedAt = pausedAt {
-            totalPausedTime += Date().timeIntervalSince(pausedAt)
+            let pausedDuration = Date().timeIntervalSince(pausedAt)
+            totalPausedTime += pausedDuration
+
+            if let sessionEndTime = sessionEndTime {
+                self.sessionEndTime = sessionEndTime.addingTimeInterval(pausedDuration)
+            }
+
             self.pausedAt = nil
         }
 
@@ -86,7 +93,14 @@ class AppViewModel: ObservableObject {
         let endTime = Date()
         let startTime = currentSessionStartTime ?? endTime
 
-        let rawElapsedSeconds = endTime.timeIntervalSince(startTime) - totalPausedTime
+        let currentPauseDuration: TimeInterval
+        if let pausedAt = pausedAt {
+            currentPauseDuration = Date().timeIntervalSince(pausedAt)
+        } else {
+            currentPauseDuration = 0
+        }
+
+        let rawElapsedSeconds = endTime.timeIntervalSince(startTime) - totalPausedTime - currentPauseDuration
         let elapsedSeconds = max(0, Int(rawElapsedSeconds.rounded()))
 
         let newLog = SessionLog(context: context)
@@ -116,7 +130,7 @@ class AppViewModel: ObservableObject {
             timeRemaining = focusDuration * 60
         }
     }
-
+    
     func resetTimer() {
         timer?.invalidate()
         isRunning = false
@@ -128,6 +142,7 @@ class AppViewModel: ObservableObject {
         currentSessionStartTime = nil
         pausedAt = nil
         totalPausedTime = 0
+        sessionEndTime = nil
     }
 
     func applySettings() {
@@ -137,6 +152,23 @@ class AppViewModel: ObservableObject {
             } else {
                 timeRemaining = breakDuration * 60
             }
+        }
+    }
+
+    func updateTimeRemaining() {
+        guard let sessionEndTime = sessionEndTime else { return }
+
+        let remaining = max(0, Int(sessionEndTime.timeIntervalSinceNow.rounded()))
+        timeRemaining = remaining
+
+        if remaining == 0 {
+            finishSession()
+        }
+    }
+
+    func handleAppDidBecomeActive() {
+        if isRunning {
+            updateTimeRemaining()
         }
     }
 
